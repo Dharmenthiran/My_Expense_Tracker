@@ -17,6 +17,11 @@ enum ExpenseCategory {
   other,
 }
 
+enum TransactionType {
+  credit,
+  expense,
+}
+
 class Expenses extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get title => text()();
@@ -24,16 +29,41 @@ class Expenses extends Table {
   DateTimeColumn get date => dateTime()();
   TextColumn get category => textEnum<ExpenseCategory>()();
   TextColumn get note => text().nullable()();
+  TextColumn get transactionType => textEnum<TransactionType>().withDefault(const Constant('expense'))();
 }
 
-@DriftDatabase(tables: [Expenses])
+class Profiles extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
+  RealColumn get salary => real().withDefault(const Constant(0.0))();
+  TextColumn get address => text().nullable()();
+  TextColumn get phone => text().nullable()();
+  TextColumn get photoPath => text().nullable()();
+}
+
+@DriftDatabase(tables: [Expenses, Profiles])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onCreate: (Migrator m) async {
+        await m.createAll();
+      },
+      onUpgrade: (Migrator m, int from, int to) async {
+        if (from < 2) {
+          // We added the Profiles table in version 2
+          await m.createTable(profiles);
+        }
+      },
+    );
+  }
 }
 
 LazyDatabase _openConnection() {

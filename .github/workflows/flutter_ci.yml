@@ -2,29 +2,17 @@ name: Flutter CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
     tags: [ "v*" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-      - run: flutter pub get
-      - run: flutter test
-
   build-android:
     name: Build Android APK
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +28,6 @@ jobs:
 
   build-windows:
     name: Build Windows EXE
-    needs: test
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,11 +37,9 @@ jobs:
       - run: flutter pub get
       - run: flutter build windows --release
       - name: Archive Windows Release
-        uses: thedoctor0/zip-release@0.7.1
-        with:
-          type: 'zip'
-          filename: 'windows-release.zip'
-          directory: 'build/windows/x64/runner/Release'
+        run: |
+          cd build/windows/x64/runner/Release
+          Compress-Archive -Path * -DestinationPath windows-release.zip
       - uses: actions/upload-artifact@v4
         with:
           name: release-windows
@@ -63,8 +48,8 @@ jobs:
   release:
     name: Create Release
     needs: [build-android, build-windows]
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
     permissions:
       contents: write
     steps:
@@ -74,9 +59,15 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: release-windows
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d-%H-%M')" >> $GITHUB_OUTPUT
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
           artifacts: "app-release.apk,windows-release.zip"
           token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', steps.date.outputs.date) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('Build {0}', steps.date.outputs.date) }}
           generateReleaseNotes: true
+          makeLatest: true

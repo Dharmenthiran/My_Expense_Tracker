@@ -5,6 +5,7 @@ import 'dashboard/dashboard_page.dart';
 import 'add_expense/add_expense_page.dart';
 import 'expense_list/expense_list_page.dart';
 import 'settings/settings_page.dart';
+import '../viewmodels/navigation_provider.dart';
 
 class MainLayout extends ConsumerStatefulWidget {
   const MainLayout({super.key});
@@ -14,8 +15,6 @@ class MainLayout extends ConsumerStatefulWidget {
 }
 
 class _MainLayoutState extends ConsumerState<MainLayout> {
-  int _selectedIndex = 0;
-
   final List<Widget> _pages = [
     const DashboardPage(),
     const AddExpensePage(),
@@ -24,13 +23,13 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   ];
 
   void _onDestinationSelected(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    ref.read(navigationIndexProvider.notifier).setIndex(index);
   }
 
   @override
   Widget build(BuildContext context) {
+    final selectedIndex = ref.watch(navigationIndexProvider);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < 600) {
@@ -44,10 +43,10 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                   child: child,
                 );
               },
-              child: _pages[_selectedIndex],
+              child: _pages[selectedIndex],
             ),
             bottomNavigationBar: NavigationBar(
-              selectedIndex: _selectedIndex,
+              selectedIndex: selectedIndex,
               onDestinationSelected: _onDestinationSelected,
               destinations: const [
                 NavigationDestination(
@@ -79,7 +78,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
             body: Row(
               children: [
                 NavigationRail(
-                  selectedIndex: _selectedIndex,
+                  selectedIndex: selectedIndex,
                   onDestinationSelected: _onDestinationSelected,
                   labelType: NavigationRailLabelType.all,
                   destinations: const [
@@ -115,7 +114,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                         child: child,
                       );
                     },
-                    child: _pages[_selectedIndex],
+                    child: _pages[selectedIndex],
                   ),
                 ),
               ],

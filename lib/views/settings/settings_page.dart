@@ -7,6 +7,8 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/theme.dart';
 import '../../viewmodels/providers.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/calculator_dialog.dart';
+import '../profile/profile_page.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -24,6 +26,7 @@ class SettingsPage extends ConsumerWidget {
         expense.amount,
         expense.category.name,
         expense.date.toIso8601String(),
+        expense.transactionType.name,
         expense.note
       ]);
     }
@@ -49,7 +52,8 @@ class SettingsPage extends ConsumerWidget {
     final isDarkMode = ref.watch(themeModeProvider);
 
     return Scaffold(
-      body: SingleChildScrollView(
+      body: SafeArea(
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,6 +82,30 @@ class SettingsPage extends ConsumerWidget {
                   ),
                   const Divider(),
                   ListTile(
+                    leading: Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
+                    title: const Text('Profile'),
+                    subtitle: const Text('Manage your profile'),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ProfilePage()),
+                      );
+                    },
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: Icon(Icons.calculate, color: Theme.of(context).colorScheme.primary),
+                    title: const Text('Calculator'),
+                    subtitle: const Text('Quick calculator'),
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => const CalculatorDialog(),
+                      );
+                    },
+                  ),
+                  const Divider(),
+                  ListTile(
                     leading: Icon(Icons.download, color: Theme.of(context).colorScheme.primary),
                     title: const Text('Export Data'),
                     subtitle: const Text('Export expenses to CSV'),
@@ -87,13 +115,14 @@ class SettingsPage extends ConsumerWidget {
                   ListTile(
                     leading: Icon(Icons.info, color: Theme.of(context).colorScheme.primary),
                     title: const Text('About'),
-                    subtitle: const Text('Expense Tracker v1.0.0'),
+                    subtitle: const Text('Expense Tracker v2.0.0'),
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
       ),
     );
   }

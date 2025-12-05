@@ -1,9 +1,17 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
+import 'package:excel/excel.dart' as excel_pkg;
+import 'package:csv/csv.dart';
 import '../../data/database.dart';
 import '../../viewmodels/providers.dart';
 import '../widgets/glass_card.dart';
+import '../add_expense/add_expense_page.dart';
 
 class ExpenseListPage extends ConsumerStatefulWidget {
   const ExpenseListPage({super.key});
@@ -16,13 +24,194 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
   String _searchQuery = '';
   ExpenseCategory? _selectedCategory;
   DateTime? _selectedDate;
+  late DateTime _selectedMonth;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  }
+
+  void _previousMonth() {
+    setState(() {
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+    });
+  }
+
+  void _nextMonth() {
+    setState(() {
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+    });
+  }
+
+  Future<void> _exportToPdf(List<Expense> expenses) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                'Expense Report - ${DateFormat.yMMMM().format(_selectedMonth)}',
+                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Table.fromTextArray(
+                headers: ['Title', 'Amount', 'Category', 'Date'],
+                data: expenses.map((expense) => [
+                  expense.title,
+                  '₹${expense.amount.toStringAsFixed(2)}',
+                  expense.category.name.toUpperCase(),
+                  DateFormat.yMMMd().format(expense.date),
+                ]).toList(),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Text(
+                'Total: ₹${expenses.fold(0.0, (sum, e) => sum + e.amount).toStringAsFixed(2)}',
+                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    final directory = await getApplicationDocumentsDirectory();
+    final path = '${directory.path}/expenses_${DateFormat('yyyy_MM').format(_selectedMonth)}.pdf';
+    final file = File(path);
+    await file.writeAsBytes(await pdf.save());
+
+    if (mounted) {
+      if (Platform.isWindows) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF saved to $path')),
+        );
+      } else {
+        await Share.shareXFiles([XFile(path)], text: 'Expense Report');
+      }
+    }
+  }
+
+  Future<void> _exportToExcel(List<Expense> expenses) async {
+    var excel = excel_pkg.Excel.createExcel();
+    excel_pkg.Sheet sheetObject = excel['Expenses'];
+
+    sheetObject.appendRow([
+      excel_pkg.TextCellValue('Title'),
+      excel_pkg.TextCellValue('Amount'),
+      excel_pkg.TextCellValue('Type'),
+      excel_pkg.TextCellValue('Category'),
+      excel_pkg.TextCellValue('Date'),
+      excel_pkg.TextCellValue('Note'),
+    ]);
+
+    for (var expense in expenses) {
+      sheetObject.appendRow([
+        excel_pkg.TextCellValue(expense.title),
+        excel_pkg.DoubleCellValue(expense.amount),
+        excel_pkg.TextCellValue(expense.transactionType.name.toUpperCase()),
+        excel_pkg.TextCellValue(expense.category.name.toUpperCase()),
+        excel_pkg.TextCellValue(DateFormat.yMMMd().format(expense.date)),
+        excel_pkg.TextCellValue(expense.note ?? ''),
+      ]);
+    }
+
+    final directory = await getApplicationDocumentsDirectory();
+    final path = '${directory.path}/expenses_${DateFormat('yyyy_MM').format(_selectedMonth)}.xlsx';
+    final file = File(path);
+    await file.writeAsBytes(excel.encode()!);
+
+    if (mounted) {
+      if (Platform.isWindows) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Excel saved to $path')),
+        );
+      } else {
+        await Share.shareXFiles([XFile(path)], text: 'Expense Report');
+      }
+    }
+  }
+
+  Future<void> _exportToCsv(List<Expense> expenses) async {
+    List<List<dynamic>> rows = [];
+    rows.add(['Title', 'Amount', 'Type', 'Category', 'Date', 'Note']);
+
+    for (var expense in expenses) {
+      rows.add([
+        expense.title,
+        expense.amount,
+        expense.transactionType.name.toUpperCase(),
+        expense.category.name.toUpperCase(),
+        DateFormat.yMMMd().format(expense.date),
+        expense.note ?? '',
+      ]);
+    }
+
+    String csv = const ListToCsvConverter().convert(rows);
+
+    final directory = await getApplicationDocumentsDirectory();
+    final path = '${directory.path}/expenses_${DateFormat('yyyy_MM').format(_selectedMonth)}.csv';
+    final file = File(path);
+    await file.writeAsString(csv);
+
+    if (mounted) {
+      if (Platform.isWindows) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('CSV saved to $path')),
+        );
+      } else {
+        await Share.shareXFiles([XFile(path)], text: 'Expense Report');
+      }
+    }
+  }
+
+  void _showExportDialog(List<Expense> expenses) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export Options'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+              title: const Text('PDF'),
+              onTap: () {
+                Navigator.pop(context);
+                _exportToPdf(expenses);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_chart, color: Colors.green),
+              title: const Text('Excel'),
+              onTap: () {
+                Navigator.pop(context);
+                _exportToExcel(expenses);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.text_snippet, color: Colors.blue),
+              title: const Text('CSV'),
+              onTap: () {
+                Navigator.pop(context);
+                _exportToCsv(expenses);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final expensesAsync = ref.watch(allExpensesProvider);
 
     return Scaffold(
-      body: Column(
+      body: SafeArea(
+        child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -33,6 +222,29 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
+                ),
+                const SizedBox(height: 16),
+                // Month Selector
+                GlassCard(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: _previousMonth,
+                      ),
+                      Text(
+                        DateFormat.yMMMM().format(_selectedMonth),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: _nextMonth,
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
                 // Search and Filter Bar
@@ -118,14 +330,41 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
               ],
             ),
           ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final allExpenses = await ref.read(allExpensesProvider.future);
+                    final filteredExpenses = allExpenses.where((expense) {
+                      final matchesMonth = expense.date.year == _selectedMonth.year &&
+                          expense.date.month == _selectedMonth.month;
+                      final matchesSearch = expense.title.toLowerCase().contains(_searchQuery.toLowerCase());
+                      final matchesCategory = _selectedCategory == null || expense.category == _selectedCategory;
+                      final matchesDate = _selectedDate == null || isSameDay(expense.date, _selectedDate!);
+                      return matchesMonth && matchesSearch && matchesCategory && matchesDate;
+                    }).toList();
+                    _showExportDialog(filteredExpenses);
+                  },
+                  icon: const Icon(Icons.file_download),
+                  label: const Text('Export'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           Expanded(
             child: expensesAsync.when(
               data: (expenses) {
                 final filteredExpenses = expenses.where((expense) {
+                  final matchesMonth = expense.date.year == _selectedMonth.year &&
+                      expense.date.month == _selectedMonth.month;
                   final matchesSearch = expense.title.toLowerCase().contains(_searchQuery.toLowerCase());
                   final matchesCategory = _selectedCategory == null || expense.category == _selectedCategory;
                   final matchesDate = _selectedDate == null || isSameDay(expense.date, _selectedDate!);
-                  return matchesSearch && matchesCategory && matchesDate;
+                  return matchesMonth && matchesSearch && matchesCategory && matchesDate;
                 }).toList();
 
                 if (filteredExpenses.isEmpty) {
@@ -147,6 +386,7 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -181,20 +421,36 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             child: ListTile(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AddExpensePage(expenseToEdit: expense),
+                  ),
+                );
+              },
               leading: CircleAvatar(
-                backgroundColor: _getCategoryColor(expense.category).withOpacity(0.2),
+                backgroundColor: expense.transactionType == TransactionType.credit
+                    ? Colors.green.withOpacity(0.2)
+                    : Colors.red.withOpacity(0.2),
                 child: Icon(
-                  _getCategoryIcon(expense.category),
-                  color: _getCategoryColor(expense.category),
+                  expense.transactionType == TransactionType.credit
+                      ? Icons.arrow_upward
+                      : Icons.arrow_downward,
+                  color: expense.transactionType == TransactionType.credit
+                      ? Colors.green
+                      : Colors.red,
                 ),
               ),
               title: Text(expense.title, style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text(DateFormat.yMMMd().format(expense.date)),
               trailing: Text(
-                NumberFormat.currency(symbol: '\$').format(expense.amount),
+                NumberFormat.currency(symbol: '₹').format(expense.amount),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: expense.transactionType == TransactionType.credit
+                      ? Colors.green
+                      : Colors.red,
                 ),
               ),
             ),
@@ -220,15 +476,31 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
           rows: expenses.map((expense) {
             return DataRow(cells: [
               DataCell(Text(expense.title)),
-              DataCell(Text(NumberFormat.currency(symbol: '\$').format(expense.amount))),
+              DataCell(Text(NumberFormat.currency(symbol: '₹').format(expense.amount))),
               DataCell(Text(expense.category.name.toUpperCase())),
               DataCell(Text(DateFormat.yMMMd().format(expense.date))),
               DataCell(
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () {
-                    ref.read(expenseRepositoryProvider).deleteExpense(expense);
-                  },
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.blue),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddExpensePage(expenseToEdit: expense),
+                          ),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () {
+                        ref.read(expenseRepositoryProvider).deleteExpense(expense);
+                      },
+                    ),
+                  ],
                 ),
               ),
             ]);

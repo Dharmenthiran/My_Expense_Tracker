@@ -16,7 +16,7 @@ class MyApp extends ConsumerWidget {
     final isDarkMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
-      title: 'Expense Tracker',
+      title: 'Money Manager',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
