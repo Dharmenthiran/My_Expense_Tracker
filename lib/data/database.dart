@@ -9,12 +9,9 @@ import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 
 part 'database.g.dart';
 
-enum ExpenseCategory {
-  food,
-  travel,
-  shopping,
-  bills,
-  other,
+class Categories extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text().unique()();
 }
 
 enum TransactionType {
@@ -27,7 +24,8 @@ class Expenses extends Table {
   TextColumn get title => text()();
   RealColumn get amount => real()();
   DateTimeColumn get date => dateTime()();
-  TextColumn get category => textEnum<ExpenseCategory>()();
+  TextColumn get timing => text().nullable()();
+  TextColumn get category => text()();
   TextColumn get note => text().nullable()();
   TextColumn get transactionType => textEnum<TransactionType>().withDefault(const Constant('expense'))();
 }
@@ -41,14 +39,14 @@ class Profiles extends Table {
   TextColumn get photoPath => text().nullable()();
 }
 
-@DriftDatabase(tables: [Expenses, Profiles])
+@DriftDatabase(tables: [Expenses, Profiles, Categories])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -60,6 +58,20 @@ class AppDatabase extends _$AppDatabase {
         if (from < 2) {
           // We added the Profiles table in version 2
           await m.createTable(profiles);
+        }
+        if (from < 3) {
+          await m.createTable(categories);
+          // Add default categories
+          final defaults = ['food', 'travel', 'shopping', 'bills', 'other'];
+          for (final cat in defaults) {
+            await into(categories).insert(
+              CategoriesCompanion.insert(name: cat),
+              mode: InsertMode.insertOrIgnore,
+            );
+          }
+        }
+        if (from < 4) {
+          await m.addColumn(expenses, expenses.timing);
         }
       },
     );

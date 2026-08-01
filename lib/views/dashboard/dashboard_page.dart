@@ -270,7 +270,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
-                                          category.name.toUpperCase(),
+                                          category.toUpperCase(),
                                           style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
                                         ),
                                       ],
@@ -352,40 +352,40 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
-  Map<ExpenseCategory, double> _calculateCategoryData(List<Expense> expenses) {
-    final data = <ExpenseCategory, double>{};
+  Map<String, double> _calculateCategoryData(List<Expense> expenses) {
+    final data = <String, double>{};
     for (var expense in expenses) {
       data[expense.category] = (data[expense.category] ?? 0) + expense.amount;
     }
     return data;
   }
 
-  Color _getCategoryColor(ExpenseCategory category) {
-    switch (category) {
-      case ExpenseCategory.food:
+  Color _getCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
         return Colors.orange;
-      case ExpenseCategory.travel:
+      case 'travel':
         return Colors.blue;
-      case ExpenseCategory.shopping:
+      case 'shopping':
         return Colors.pink;
-      case ExpenseCategory.bills:
+      case 'bills':
         return Colors.red;
-      case ExpenseCategory.other:
+      default:
         return Colors.grey;
     }
   }
 
-  IconData _getCategoryIcon(ExpenseCategory category) {
-    switch (category) {
-      case ExpenseCategory.food:
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
         return Icons.fastfood;
-      case ExpenseCategory.travel:
+      case 'travel':
         return Icons.flight;
-      case ExpenseCategory.shopping:
+      case 'shopping':
         return Icons.shopping_bag;
-      case ExpenseCategory.bills:
+      case 'bills':
         return Icons.receipt;
-      case ExpenseCategory.other:
+      default:
         return Icons.category;
     }
   }

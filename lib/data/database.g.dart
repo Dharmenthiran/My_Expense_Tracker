@@ -48,15 +48,26 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _timingMeta = const VerificationMeta('timing');
   @override
-  late final GeneratedColumnWithTypeConverter<ExpenseCategory, String>
-  category = GeneratedColumn<String>(
+  late final GeneratedColumn<String> timing = GeneratedColumn<String>(
+    'timing',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
     'category',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-  ).withConverter<ExpenseCategory>($ExpensesTable.$convertercategory);
+  );
   static const VerificationMeta _noteMeta = const VerificationMeta('note');
   @override
   late final GeneratedColumn<String> note = GeneratedColumn<String>(
@@ -82,6 +93,7 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     title,
     amount,
     date,
+    timing,
     category,
     note,
     transactionType,
@@ -125,6 +137,20 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     } else if (isInserting) {
       context.missing(_dateMeta);
     }
+    if (data.containsKey('timing')) {
+      context.handle(
+        _timingMeta,
+        timing.isAcceptableOrUnknown(data['timing']!, _timingMeta),
+      );
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_categoryMeta);
+    }
     if (data.containsKey('note')) {
       context.handle(
         _noteMeta,
@@ -156,12 +182,14 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}date'],
       )!,
-      category: $ExpensesTable.$convertercategory.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}category'],
-        )!,
+      timing: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}timing'],
       ),
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
       note: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}note'],
@@ -180,10 +208,6 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     return $ExpensesTable(attachedDatabase, alias);
   }
 
-  static JsonTypeConverter2<ExpenseCategory, String, String>
-  $convertercategory = const EnumNameConverter<ExpenseCategory>(
-    ExpenseCategory.values,
-  );
   static JsonTypeConverter2<TransactionType, String, String>
   $convertertransactionType = const EnumNameConverter<TransactionType>(
     TransactionType.values,
@@ -195,7 +219,8 @@ class Expense extends DataClass implements Insertable<Expense> {
   final String title;
   final double amount;
   final DateTime date;
-  final ExpenseCategory category;
+  final String? timing;
+  final String category;
   final String? note;
   final TransactionType transactionType;
   const Expense({
@@ -203,6 +228,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     required this.title,
     required this.amount,
     required this.date,
+    this.timing,
     required this.category,
     this.note,
     required this.transactionType,
@@ -214,11 +240,10 @@ class Expense extends DataClass implements Insertable<Expense> {
     map['title'] = Variable<String>(title);
     map['amount'] = Variable<double>(amount);
     map['date'] = Variable<DateTime>(date);
-    {
-      map['category'] = Variable<String>(
-        $ExpensesTable.$convertercategory.toSql(category),
-      );
+    if (!nullToAbsent || timing != null) {
+      map['timing'] = Variable<String>(timing);
     }
+    map['category'] = Variable<String>(category);
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
     }
@@ -236,6 +261,9 @@ class Expense extends DataClass implements Insertable<Expense> {
       title: Value(title),
       amount: Value(amount),
       date: Value(date),
+      timing: timing == null && nullToAbsent
+          ? const Value.absent()
+          : Value(timing),
       category: Value(category),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       transactionType: Value(transactionType),
@@ -252,9 +280,8 @@ class Expense extends DataClass implements Insertable<Expense> {
       title: serializer.fromJson<String>(json['title']),
       amount: serializer.fromJson<double>(json['amount']),
       date: serializer.fromJson<DateTime>(json['date']),
-      category: $ExpensesTable.$convertercategory.fromJson(
-        serializer.fromJson<String>(json['category']),
-      ),
+      timing: serializer.fromJson<String?>(json['timing']),
+      category: serializer.fromJson<String>(json['category']),
       note: serializer.fromJson<String?>(json['note']),
       transactionType: $ExpensesTable.$convertertransactionType.fromJson(
         serializer.fromJson<String>(json['transactionType']),
@@ -269,9 +296,8 @@ class Expense extends DataClass implements Insertable<Expense> {
       'title': serializer.toJson<String>(title),
       'amount': serializer.toJson<double>(amount),
       'date': serializer.toJson<DateTime>(date),
-      'category': serializer.toJson<String>(
-        $ExpensesTable.$convertercategory.toJson(category),
-      ),
+      'timing': serializer.toJson<String?>(timing),
+      'category': serializer.toJson<String>(category),
       'note': serializer.toJson<String?>(note),
       'transactionType': serializer.toJson<String>(
         $ExpensesTable.$convertertransactionType.toJson(transactionType),
@@ -284,7 +310,8 @@ class Expense extends DataClass implements Insertable<Expense> {
     String? title,
     double? amount,
     DateTime? date,
-    ExpenseCategory? category,
+    Value<String?> timing = const Value.absent(),
+    String? category,
     Value<String?> note = const Value.absent(),
     TransactionType? transactionType,
   }) => Expense(
@@ -292,6 +319,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     title: title ?? this.title,
     amount: amount ?? this.amount,
     date: date ?? this.date,
+    timing: timing.present ? timing.value : this.timing,
     category: category ?? this.category,
     note: note.present ? note.value : this.note,
     transactionType: transactionType ?? this.transactionType,
@@ -302,6 +330,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       title: data.title.present ? data.title.value : this.title,
       amount: data.amount.present ? data.amount.value : this.amount,
       date: data.date.present ? data.date.value : this.date,
+      timing: data.timing.present ? data.timing.value : this.timing,
       category: data.category.present ? data.category.value : this.category,
       note: data.note.present ? data.note.value : this.note,
       transactionType: data.transactionType.present
@@ -317,6 +346,7 @@ class Expense extends DataClass implements Insertable<Expense> {
           ..write('title: $title, ')
           ..write('amount: $amount, ')
           ..write('date: $date, ')
+          ..write('timing: $timing, ')
           ..write('category: $category, ')
           ..write('note: $note, ')
           ..write('transactionType: $transactionType')
@@ -325,8 +355,16 @@ class Expense extends DataClass implements Insertable<Expense> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, amount, date, category, note, transactionType);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    amount,
+    date,
+    timing,
+    category,
+    note,
+    transactionType,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -335,6 +373,7 @@ class Expense extends DataClass implements Insertable<Expense> {
           other.title == this.title &&
           other.amount == this.amount &&
           other.date == this.date &&
+          other.timing == this.timing &&
           other.category == this.category &&
           other.note == this.note &&
           other.transactionType == this.transactionType);
@@ -345,7 +384,8 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
   final Value<String> title;
   final Value<double> amount;
   final Value<DateTime> date;
-  final Value<ExpenseCategory> category;
+  final Value<String?> timing;
+  final Value<String> category;
   final Value<String?> note;
   final Value<TransactionType> transactionType;
   const ExpensesCompanion({
@@ -353,6 +393,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     this.title = const Value.absent(),
     this.amount = const Value.absent(),
     this.date = const Value.absent(),
+    this.timing = const Value.absent(),
     this.category = const Value.absent(),
     this.note = const Value.absent(),
     this.transactionType = const Value.absent(),
@@ -362,7 +403,8 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     required String title,
     required double amount,
     required DateTime date,
-    required ExpenseCategory category,
+    this.timing = const Value.absent(),
+    required String category,
     this.note = const Value.absent(),
     this.transactionType = const Value.absent(),
   }) : title = Value(title),
@@ -374,6 +416,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Expression<String>? title,
     Expression<double>? amount,
     Expression<DateTime>? date,
+    Expression<String>? timing,
     Expression<String>? category,
     Expression<String>? note,
     Expression<String>? transactionType,
@@ -383,6 +426,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       if (title != null) 'title': title,
       if (amount != null) 'amount': amount,
       if (date != null) 'date': date,
+      if (timing != null) 'timing': timing,
       if (category != null) 'category': category,
       if (note != null) 'note': note,
       if (transactionType != null) 'transaction_type': transactionType,
@@ -394,7 +438,8 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Value<String>? title,
     Value<double>? amount,
     Value<DateTime>? date,
-    Value<ExpenseCategory>? category,
+    Value<String?>? timing,
+    Value<String>? category,
     Value<String?>? note,
     Value<TransactionType>? transactionType,
   }) {
@@ -403,6 +448,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       title: title ?? this.title,
       amount: amount ?? this.amount,
       date: date ?? this.date,
+      timing: timing ?? this.timing,
       category: category ?? this.category,
       note: note ?? this.note,
       transactionType: transactionType ?? this.transactionType,
@@ -424,10 +470,11 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     if (date.present) {
       map['date'] = Variable<DateTime>(date.value);
     }
+    if (timing.present) {
+      map['timing'] = Variable<String>(timing.value);
+    }
     if (category.present) {
-      map['category'] = Variable<String>(
-        $ExpensesTable.$convertercategory.toSql(category.value),
-      );
+      map['category'] = Variable<String>(category.value);
     }
     if (note.present) {
       map['note'] = Variable<String>(note.value);
@@ -447,6 +494,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
           ..write('title: $title, ')
           ..write('amount: $amount, ')
           ..write('date: $date, ')
+          ..write('timing: $timing, ')
           ..write('category: $category, ')
           ..write('note: $note, ')
           ..write('transactionType: $transactionType')
@@ -848,16 +896,209 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
   }
 }
 
+class $CategoriesTable extends Categories
+    with TableInfo<$CategoriesTable, Category> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CategoriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'categories';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Category> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Category map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Category(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+    );
+  }
+
+  @override
+  $CategoriesTable createAlias(String alias) {
+    return $CategoriesTable(attachedDatabase, alias);
+  }
+}
+
+class Category extends DataClass implements Insertable<Category> {
+  final int id;
+  final String name;
+  const Category({required this.id, required this.name});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    return map;
+  }
+
+  CategoriesCompanion toCompanion(bool nullToAbsent) {
+    return CategoriesCompanion(id: Value(id), name: Value(name));
+  }
+
+  factory Category.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Category(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+    };
+  }
+
+  Category copyWith({int? id, String? name}) =>
+      Category(id: id ?? this.id, name: name ?? this.name);
+  Category copyWithCompanion(CategoriesCompanion data) {
+    return Category(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Category(')
+          ..write('id: $id, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Category && other.id == this.id && other.name == this.name);
+}
+
+class CategoriesCompanion extends UpdateCompanion<Category> {
+  final Value<int> id;
+  final Value<String> name;
+  const CategoriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+  });
+  CategoriesCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+  }) : name = Value(name);
+  static Insertable<Category> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+    });
+  }
+
+  CategoriesCompanion copyWith({Value<int>? id, Value<String>? name}) {
+    return CategoriesCompanion(id: id ?? this.id, name: name ?? this.name);
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CategoriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $ExpensesTable expenses = $ExpensesTable(this);
   late final $ProfilesTable profiles = $ProfilesTable(this);
+  late final $CategoriesTable categories = $CategoriesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [expenses, profiles];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    expenses,
+    profiles,
+    categories,
+  ];
 }
 
 typedef $$ExpensesTableCreateCompanionBuilder =
@@ -866,7 +1107,8 @@ typedef $$ExpensesTableCreateCompanionBuilder =
       required String title,
       required double amount,
       required DateTime date,
-      required ExpenseCategory category,
+      Value<String?> timing,
+      required String category,
       Value<String?> note,
       Value<TransactionType> transactionType,
     });
@@ -876,7 +1118,8 @@ typedef $$ExpensesTableUpdateCompanionBuilder =
       Value<String> title,
       Value<double> amount,
       Value<DateTime> date,
-      Value<ExpenseCategory> category,
+      Value<String?> timing,
+      Value<String> category,
       Value<String?> note,
       Value<TransactionType> transactionType,
     });
@@ -910,10 +1153,14 @@ class $$ExpensesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<ExpenseCategory, ExpenseCategory, String>
-  get category => $composableBuilder(
+  ColumnFilters<String> get timing => $composableBuilder(
+    column: $table.timing,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
     column: $table.category,
-    builder: (column) => ColumnWithTypeConverterFilters(column),
+    builder: (column) => ColumnFilters(column),
   );
 
   ColumnFilters<String> get note => $composableBuilder(
@@ -957,6 +1204,11 @@ class $$ExpensesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get timing => $composableBuilder(
+    column: $table.timing,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get category => $composableBuilder(
     column: $table.category,
     builder: (column) => ColumnOrderings(column),
@@ -994,7 +1246,10 @@ class $$ExpensesTableAnnotationComposer
   GeneratedColumn<DateTime> get date =>
       $composableBuilder(column: $table.date, builder: (column) => column);
 
-  GeneratedColumnWithTypeConverter<ExpenseCategory, String> get category =>
+  GeneratedColumn<String> get timing =>
+      $composableBuilder(column: $table.timing, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
       $composableBuilder(column: $table.category, builder: (column) => column);
 
   GeneratedColumn<String> get note =>
@@ -1039,7 +1294,8 @@ class $$ExpensesTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<double> amount = const Value.absent(),
                 Value<DateTime> date = const Value.absent(),
-                Value<ExpenseCategory> category = const Value.absent(),
+                Value<String?> timing = const Value.absent(),
+                Value<String> category = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 Value<TransactionType> transactionType = const Value.absent(),
               }) => ExpensesCompanion(
@@ -1047,6 +1303,7 @@ class $$ExpensesTableTableManager
                 title: title,
                 amount: amount,
                 date: date,
+                timing: timing,
                 category: category,
                 note: note,
                 transactionType: transactionType,
@@ -1057,7 +1314,8 @@ class $$ExpensesTableTableManager
                 required String title,
                 required double amount,
                 required DateTime date,
-                required ExpenseCategory category,
+                Value<String?> timing = const Value.absent(),
+                required String category,
                 Value<String?> note = const Value.absent(),
                 Value<TransactionType> transactionType = const Value.absent(),
               }) => ExpensesCompanion.insert(
@@ -1065,6 +1323,7 @@ class $$ExpensesTableTableManager
                 title: title,
                 amount: amount,
                 date: date,
+                timing: timing,
                 category: category,
                 note: note,
                 transactionType: transactionType,
@@ -1298,6 +1557,123 @@ typedef $$ProfilesTableProcessedTableManager =
       Profile,
       PrefetchHooks Function()
     >;
+typedef $$CategoriesTableCreateCompanionBuilder =
+    CategoriesCompanion Function({Value<int> id, required String name});
+typedef $$CategoriesTableUpdateCompanionBuilder =
+    CategoriesCompanion Function({Value<int> id, Value<String> name});
+
+class $$CategoriesTableFilterComposer
+    extends Composer<_$AppDatabase, $CategoriesTable> {
+  $$CategoriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CategoriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CategoriesTable> {
+  $$CategoriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CategoriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CategoriesTable> {
+  $$CategoriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+}
+
+class $$CategoriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CategoriesTable,
+          Category,
+          $$CategoriesTableFilterComposer,
+          $$CategoriesTableOrderingComposer,
+          $$CategoriesTableAnnotationComposer,
+          $$CategoriesTableCreateCompanionBuilder,
+          $$CategoriesTableUpdateCompanionBuilder,
+          (Category, BaseReferences<_$AppDatabase, $CategoriesTable, Category>),
+          Category,
+          PrefetchHooks Function()
+        > {
+  $$CategoriesTableTableManager(_$AppDatabase db, $CategoriesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CategoriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CategoriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CategoriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+              }) => CategoriesCompanion(id: id, name: name),
+          createCompanionCallback:
+              ({Value<int> id = const Value.absent(), required String name}) =>
+                  CategoriesCompanion.insert(id: id, name: name),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CategoriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CategoriesTable,
+      Category,
+      $$CategoriesTableFilterComposer,
+      $$CategoriesTableOrderingComposer,
+      $$CategoriesTableAnnotationComposer,
+      $$CategoriesTableCreateCompanionBuilder,
+      $$CategoriesTableUpdateCompanionBuilder,
+      (Category, BaseReferences<_$AppDatabase, $CategoriesTable, Category>),
+      Category,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -1306,4 +1682,6 @@ class $AppDatabaseManager {
       $$ExpensesTableTableManager(_db, _db.expenses);
   $$ProfilesTableTableManager get profiles =>
       $$ProfilesTableTableManager(_db, _db.profiles);
+  $$CategoriesTableTableManager get categories =>
+      $$CategoriesTableTableManager(_db, _db.categories);
 }

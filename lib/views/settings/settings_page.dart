@@ -9,6 +9,7 @@ import '../../viewmodels/providers.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/calculator_dialog.dart';
 import '../profile/profile_page.dart';
+import 'category_list_page.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -17,14 +18,15 @@ class SettingsPage extends ConsumerWidget {
     final expenses = await ref.read(allExpensesProvider.future);
     
     List<List<dynamic>> rows = [];
-    rows.add(["ID", "Title", "Amount", "Category", "Date", "Note"]);
+    rows.add(["ID", "Title", "Amount", "Category", "Timing", "Date", "Note"]);
     
     for (var expense in expenses) {
       rows.add([
         expense.id,
         expense.title,
         expense.amount,
-        expense.category.name,
+        expense.category,
+        expense.timing ?? '',
         expense.date.toIso8601String(),
         expense.transactionType.name,
         expense.note
@@ -89,6 +91,18 @@ class SettingsPage extends ConsumerWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => const ProfilePage()),
+                      );
+                    },
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: Icon(Icons.category, color: Theme.of(context).colorScheme.primary),
+                    title: const Text('Manage Categories'),
+                    subtitle: const Text('Add or remove expense categories'),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const CategoryListPage()),
                       );
                     },
                   ),

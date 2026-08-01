@@ -20,6 +20,12 @@ final allExpensesProvider = StreamProvider<List<Expense>>((ref) {
   return repository.watchAllExpenses();
 });
 
+// Stream of all categories
+final allCategoriesProvider = StreamProvider<List<Category>>((ref) {
+  final repository = ref.watch(expenseRepositoryProvider);
+  return repository.watchAllCategories();
+});
+
 // Theme Mode Provider
 final themeModeProvider = NotifierProvider<ThemeModeNotifier, bool>(ThemeModeNotifier.new);
 

@@ -22,7 +22,9 @@ class _AddExpensePageState extends ConsumerState<AddExpensePage> {
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
-  ExpenseCategory _selectedCategory = ExpenseCategory.food;
+  final _categoryController = TextEditingController(text: 'food');
+  String _selectedCategory = 'food';
+  String _selectedTiming = 'Morning';
   TransactionType _transactionType = TransactionType.expense;
   bool _isLoading = false;
 
@@ -36,6 +38,8 @@ class _AddExpensePageState extends ConsumerState<AddExpensePage> {
       _noteController.text = expense.note ?? '';
       _selectedDate = expense.date;
       _selectedCategory = expense.category;
+      _categoryController.text = expense.category;
+      _selectedTiming = expense.timing ?? 'Morning';
       _transactionType = expense.transactionType;
     }
   }
@@ -45,6 +49,7 @@ class _AddExpensePageState extends ConsumerState<AddExpensePage> {
     _titleController.dispose();
     _amountController.dispose();
     _noteController.dispose();
+    _categoryController.dispose();
     super.dispose();
   }
 
@@ -63,12 +68,17 @@ class _AddExpensePageState extends ConsumerState<AddExpensePage> {
             title: _titleController.text,
             amount: amount,
             date: _selectedDate,
-            category: _selectedCategory,
+            category: _categoryController.text.trim(),
+            timing: drift.Value(_selectedTiming),
             note: drift.Value(_noteController.text.isEmpty ? null : _noteController.text),
             transactionType: _transactionType,
           );
           
           await ref.read(expenseRepositoryProvider).updateExpense(updatedExpense);
+          final catName = _categoryController.text.trim();
+          if (catName.isNotEmpty) {
+            await ref.read(expenseRepositoryProvider).addCategory(CategoriesCompanion.insert(name: catName));
+          }
           
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -82,12 +92,17 @@ class _AddExpensePageState extends ConsumerState<AddExpensePage> {
             title: drift.Value(_titleController.text),
             amount: drift.Value(amount),
             date: drift.Value(_selectedDate),
-            category: drift.Value(_selectedCategory),
+            category: drift.Value(_categoryController.text.trim()),
+            timing: drift.Value(_selectedTiming),
             note: drift.Value(_noteController.text.isEmpty ? null : _noteController.text),
             transactionType: drift.Value(_transactionType),
           );
 
           await ref.read(expenseRepositoryProvider).addExpense(expense);
+          final catName = _categoryController.text.trim();
+          if (catName.isNotEmpty) {
+            await ref.read(expenseRepositoryProvider).addCategory(CategoriesCompanion.insert(name: catName));
+          }
           
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -120,7 +135,9 @@ class _AddExpensePageState extends ConsumerState<AddExpensePage> {
     _noteController.clear();
     setState(() {
       _selectedDate = DateTime.now();
-      _selectedCategory = ExpenseCategory.food;
+      _selectedCategory = 'food';
+      _categoryController.text = 'food';
+      _selectedTiming = 'Morning';
       _transactionType = TransactionType.expense;
     });
   }
@@ -198,23 +215,50 @@ class _AddExpensePageState extends ConsumerState<AddExpensePage> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    DropdownButtonFormField<ExpenseCategory>(
-                      value: _selectedCategory,
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final categoriesAsync = ref.watch(allCategoriesProvider);
+                        final categories = categoriesAsync.value ?? [];
+                        
+                        return DropdownMenu<String>(
+                          controller: _categoryController,
+                          label: const Text('Category'),
+                          leadingIcon: const Icon(Icons.category),
+                          expandedInsets: EdgeInsets.zero,
+                          enableSearch: true,
+                          enableFilter: true,
+                          dropdownMenuEntries: categories.map((cat) {
+                            return DropdownMenuEntry(
+                              value: cat.name,
+                              label: cat.name,
+                            );
+                          }).toList(),
+                          onSelected: (value) {
+                            if (value != null) {
+                              _selectedCategory = value;
+                            }
+                          },
+                        );
+                      }
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _selectedTiming,
                       decoration: const InputDecoration(
-                        labelText: 'Category',
-                        prefixIcon: Icon(Icons.category),
+                        labelText: 'Timing',
+                        prefixIcon: Icon(Icons.access_time),
                         border: OutlineInputBorder(),
                       ),
-                      items: ExpenseCategory.values.map((category) {
+                      items: ['Morning', 'Afternoon', 'Evening', 'Night'].map((timing) {
                         return DropdownMenuItem(
-                          value: category,
-                          child: Text(category.name.toUpperCase()),
+                          value: timing,
+                          child: Text(timing),
                         );
                       }).toList(),
                       onChanged: (value) {
                         if (value != null) {
                           setState(() {
-                            _selectedCategory = value;
+                            _selectedTiming = value;
                           });
                         }
                       },

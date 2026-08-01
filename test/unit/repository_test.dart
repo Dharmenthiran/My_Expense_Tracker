@@ -23,7 +23,7 @@ void main() {
       title: const drift.Value('Test Expense'),
       amount: const drift.Value(100.0),
       date: drift.Value(DateTime.now()),
-      category: const drift.Value(ExpenseCategory.food),
+      category: const drift.Value('food'),
     );
 
     await repository.addExpense(expense);
@@ -38,7 +38,7 @@ void main() {
       title: const drift.Value('Test Expense'),
       amount: const drift.Value(100.0),
       date: drift.Value(DateTime.now()),
-      category: const drift.Value(ExpenseCategory.food),
+      category: const drift.Value('food'),
     );
 
     await repository.addExpense(expense);
@@ -55,22 +55,22 @@ void main() {
       title: const drift.Value('Food'),
       amount: const drift.Value(10.0),
       date: drift.Value(DateTime.now()),
-      category: const drift.Value(ExpenseCategory.food),
+      category: const drift.Value('food'),
     ));
     
     await repository.addExpense(ExpensesCompanion(
       title: const drift.Value('Travel'),
       amount: const drift.Value(20.0),
       date: drift.Value(DateTime.now()),
-      category: const drift.Value(ExpenseCategory.travel),
+      category: const drift.Value('travel'),
     ));
 
-    final foodExpenses = await repository.getExpensesByCategory(ExpenseCategory.food);
+    final foodExpenses = await repository.getExpensesByCategory('food');
     expect(foodExpenses.length, 1);
-    expect(foodExpenses.first.category, ExpenseCategory.food);
+    expect(foodExpenses.first.category, 'food');
     
-    final travelExpenses = await repository.getExpensesByCategory(ExpenseCategory.travel);
+    final travelExpenses = await repository.getExpensesByCategory('travel');
     expect(travelExpenses.length, 1);
-    expect(travelExpenses.first.category, ExpenseCategory.travel);
+    expect(travelExpenses.first.category, 'travel');
   });
 }

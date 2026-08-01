@@ -25,9 +25,9 @@ class ExpenseRepository {
   Future<int> deleteExpense(Expense expense) =>
       _db.delete(_db.expenses).delete(expense);
 
-  Future<List<Expense>> getExpensesByCategory(ExpenseCategory category) {
+  Future<List<Expense>> getExpensesByCategory(String category) {
     return (_db.select(_db.expenses)
-          ..where((t) => t.category.equals(category.name)))
+          ..where((t) => t.category.equals(category)))
         .get();
   }
   
@@ -40,4 +40,15 @@ class ExpenseRepository {
       ..orderBy([(t) => OrderingTerm(expression: t.date, mode: OrderingMode.desc)]))
       .watch();
   }
+
+  // Categories API
+  Stream<List<Category>> watchAllCategories() => _db.select(_db.categories).watch();
+
+  Future<List<Category>> getAllCategories() => _db.select(_db.categories).get();
+
+  Future<int> addCategory(CategoriesCompanion category) =>
+      _db.into(_db.categories).insert(category, mode: InsertMode.insertOrIgnore);
+
+  Future<int> deleteCategory(Category category) =>
+      _db.delete(_db.categories).delete(category);
 }

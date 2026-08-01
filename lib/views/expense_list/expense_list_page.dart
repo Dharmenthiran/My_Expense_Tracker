@@ -22,7 +22,7 @@ class ExpenseListPage extends ConsumerStatefulWidget {
 
 class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
   String _searchQuery = '';
-  ExpenseCategory? _selectedCategory;
+  String? _selectedCategory;
   DateTime? _selectedDate;
   late DateTime _selectedMonth;
 
@@ -59,11 +59,12 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
               ),
               pw.SizedBox(height: 20),
               pw.Table.fromTextArray(
-                headers: ['Title', 'Amount', 'Category', 'Date'],
+                headers: ['Title', 'Amount', 'Category', 'Timing', 'Date'],
                 data: expenses.map((expense) => [
                   expense.title,
                   '₹${expense.amount.toStringAsFixed(2)}',
-                  expense.category.name.toUpperCase(),
+                  expense.category.toUpperCase(),
+                  expense.timing ?? '',
                   DateFormat.yMMMd().format(expense.date),
                 ]).toList(),
               ),
@@ -103,6 +104,7 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
       excel_pkg.TextCellValue('Amount'),
       excel_pkg.TextCellValue('Type'),
       excel_pkg.TextCellValue('Category'),
+      excel_pkg.TextCellValue('Timing'),
       excel_pkg.TextCellValue('Date'),
       excel_pkg.TextCellValue('Note'),
     ]);
@@ -112,7 +114,8 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
         excel_pkg.TextCellValue(expense.title),
         excel_pkg.DoubleCellValue(expense.amount),
         excel_pkg.TextCellValue(expense.transactionType.name.toUpperCase()),
-        excel_pkg.TextCellValue(expense.category.name.toUpperCase()),
+        excel_pkg.TextCellValue(expense.category.toUpperCase()),
+        excel_pkg.TextCellValue(expense.timing ?? ''),
         excel_pkg.TextCellValue(DateFormat.yMMMd().format(expense.date)),
         excel_pkg.TextCellValue(expense.note ?? ''),
       ]);
@@ -136,14 +139,15 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
 
   Future<void> _exportToCsv(List<Expense> expenses) async {
     List<List<dynamic>> rows = [];
-    rows.add(['Title', 'Amount', 'Type', 'Category', 'Date', 'Note']);
+    rows.add(['Title', 'Amount', 'Type', 'Category', 'Timing', 'Date', 'Note']);
 
     for (var expense in expenses) {
       rows.add([
         expense.title,
         expense.amount,
         expense.transactionType.name.toUpperCase(),
-        expense.category.name.toUpperCase(),
+        expense.category.toUpperCase(),
+        expense.timing ?? '',
         DateFormat.yMMMd().format(expense.date),
         expense.note ?? '',
       ]);
@@ -267,30 +271,36 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
                       Row(
                         children: [
                           Expanded(
-                            child: DropdownButtonFormField<ExpenseCategory>(
-                              value: _selectedCategory,
-                              decoration: const InputDecoration(
-                                labelText: 'Category',
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              items: [
-                                const DropdownMenuItem(
-                                  value: null,
-                                  child: Text('All'),
-                                ),
-                                ...ExpenseCategory.values.map((category) {
-                                  return DropdownMenuItem(
-                                    value: category,
-                                    child: Text(category.name.toUpperCase()),
-                                  );
-                                }),
-                              ],
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedCategory = value;
-                                });
-                              },
+                            child: Consumer(
+                              builder: (context, ref, child) {
+                                final categoriesAsync = ref.watch(allCategoriesProvider);
+                                final categories = categoriesAsync.value ?? [];
+                                return DropdownButtonFormField<String>(
+                                  value: _selectedCategory,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Category',
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  items: [
+                                    const DropdownMenuItem(
+                                      value: null,
+                                      child: Text('All'),
+                                    ),
+                                    ...categories.map((category) {
+                                      return DropdownMenuItem(
+                                        value: category.name,
+                                        child: Text(category.name.toUpperCase()),
+                                      );
+                                    }).toList(),
+                                  ],
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedCategory = value;
+                                    });
+                                  },
+                                );
+                              }
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -443,7 +453,7 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
                 ),
               ),
               title: Text(expense.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(DateFormat.yMMMd().format(expense.date)),
+              subtitle: Text('${DateFormat.yMMMd().format(expense.date)} • ${expense.timing ?? ''}'),
               trailing: Text(
                 NumberFormat.currency(symbol: '₹').format(expense.amount),
                 style: TextStyle(
@@ -470,6 +480,7 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
             DataColumn(label: Text('Title')),
             DataColumn(label: Text('Amount')),
             DataColumn(label: Text('Category')),
+            DataColumn(label: Text('Timing')),
             DataColumn(label: Text('Date')),
             DataColumn(label: Text('Actions')),
           ],
@@ -477,7 +488,8 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
             return DataRow(cells: [
               DataCell(Text(expense.title)),
               DataCell(Text(NumberFormat.currency(symbol: '₹').format(expense.amount))),
-              DataCell(Text(expense.category.name.toUpperCase())),
+              DataCell(Text(expense.category.toUpperCase())),
+              DataCell(Text(expense.timing ?? '')),
               DataCell(Text(DateFormat.yMMMd().format(expense.date))),
               DataCell(
                 Row(
@@ -510,32 +522,32 @@ class _ExpenseListPageState extends ConsumerState<ExpenseListPage> {
     );
   }
 
-  Color _getCategoryColor(ExpenseCategory category) {
-    switch (category) {
-      case ExpenseCategory.food:
+  Color _getCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
         return Colors.orange;
-      case ExpenseCategory.travel:
+      case 'travel':
         return Colors.blue;
-      case ExpenseCategory.shopping:
+      case 'shopping':
         return Colors.pink;
-      case ExpenseCategory.bills:
+      case 'bills':
         return Colors.red;
-      case ExpenseCategory.other:
+      default:
         return Colors.grey;
     }
   }
 
-  IconData _getCategoryIcon(ExpenseCategory category) {
-    switch (category) {
-      case ExpenseCategory.food:
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
         return Icons.fastfood;
-      case ExpenseCategory.travel:
+      case 'travel':
         return Icons.flight;
-      case ExpenseCategory.shopping:
+      case 'shopping':
         return Icons.shopping_bag;
-      case ExpenseCategory.bills:
+      case 'bills':
         return Icons.receipt;
-      case ExpenseCategory.other:
+      default:
         return Icons.category;
     }
   }
